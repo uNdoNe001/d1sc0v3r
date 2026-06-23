@@ -1,0 +1,44 @@
+# Copyright (c) 2026 Rick Bohm
+# Summit Cyber Group, LLC
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+services:
+  d1sc0v3r:
+    build: .
+    container_name: d1sc0v3r
+    # Host networking: required so masscan/nmap can do raw-socket sweeps and ARP
+    # discovery across your subnets the same way they would from the host itself.
+    network_mode: host
+    cap_add:
+      - NET_RAW      # raw sockets for masscan / nmap SYN + ICMP
+      - NET_ADMIN    # interface/route inspection for ARP discovery
+    environment:
+      # UI binds here. 127.0.0.1 = local only. Change to 0.0.0.0 for LAN access.
+      D1_HOST: 127.0.0.1
+      D1_PORT: 8040
+      # Your local qwen3:8b (Ollama). Categorization + priority narrative.
+      # Default assumes Ollama runs on the SAME machine — with host networking
+      # the container reaches 127.0.0.1:11434 directly. For a remote Ollama,
+      # set this to http://<ollama-host>:11434 (and make sure that host has
+      # OLLAMA_HOST=0.0.0.0:11434 so it listens on the network).
+      D1_LLM_URL: ${D1_LLM_URL:-http://127.0.0.1:11434}
+      D1_LLM_MODEL: ${D1_LLM_MODEL:-qwen3:8b}
+      D1_LLM_ENABLED: ${D1_LLM_ENABLED:-1}
+    volumes:
+      # The only thing you need to back up: scan history + raw nmap output.
+      - ./data:/app/data
+      # Live-mount source for iteration without rebuilds (comment out to freeze).
+      - ./app:/app/app
+    restart: unless-stopped

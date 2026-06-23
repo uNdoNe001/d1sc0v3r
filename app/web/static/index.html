@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<!--
+  Copyright (c) 2026 Rick Bohm
+  Summit Cyber Group, LLC
+  SPDX-License-Identifier: Apache-2.0
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>d1sc0v3r</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <h1>d1sc0v3r<span class="dim">// authorized recon by Summit Cyber Group</span></h1>
+    <img class="brand-logo" src="/static/summit-logo.png" alt="Summit Cyber Group" width="20" height="20" />
+    <div class="header-right">
+      <button id="stop-all" class="stop-all hidden" title="Cancel every running scan immediately">⛔ Stop all (<span id="run-count">0</span>)</button>
+      <div id="llm-status" class="pill">llm: …</div>
+    </div>
+  </header>
+
+  <main>
+    <!-- LEFT: new scan -->
+    <section class="panel" id="launch">
+      <h2>New sweep</h2>
+      <label>Subnets <span class="dim">(CIDR or IP, paste any number)</span></label>
+      <textarea id="subnets" placeholder="10.0.0.0/24&#10;192.168.1.0/24&#10;172.16.5.10"></textarea>
+
+      <label>Profile</label>
+      <select id="profile"></select>
+
+      <div class="row">
+        <button id="preview-btn" class="ghost">Preview</button>
+        <button id="scan-btn">Launch sweep</button>
+      </div>
+      <div id="preview" class="muted"></div>
+
+      <h2>History</h2>
+      <ul id="history" class="history"></ul>
+    </section>
+
+    <!-- RIGHT: results -->
+    <section class="panel grow" id="results">
+      <div id="scan-head" class="hidden">
+        <div id="scan-subnets" class="scan-subnets"></div>
+        <div class="progress-wrap">
+          <div class="progress-bar"><div id="bar"></div></div>
+          <div id="stage" class="muted"></div>
+        </div>
+        <div id="totals" class="totals"></div>
+        <div class="row">
+          <button id="stop-btn" class="ghost hidden">Stop</button>
+          <button id="delete-btn" class="ghost danger">Delete scan</button>
+        </div>
+        <div id="export" class="export hidden">
+          <input id="engagement" type="text" placeholder="Customer / engagement name (for filename + Obsidian frontmatter)" />
+          <div class="row">
+            <button id="md-btn" class="ghost">⬇ Markdown (Obsidian)</button>
+            <button id="copy-btn" class="ghost">⧉ Copy Markdown</button>
+            <button id="csv-btn" class="ghost">⬇ CSV</button>
+          </div>
+          <div id="copy-note" class="muted"></div>
+        </div>
+      </div>
+
+      <div id="priority" class="hidden">
+        <h2>Priority targets</h2>
+        <div id="priority-list"></div>
+      </div>
+
+      <div id="categories" class="hidden">
+        <h2>Assets by category</h2>
+        <div id="category-list"></div>
+      </div>
+
+      <p id="empty" class="muted">Paste subnets and launch a sweep to begin.</p>
+    </section>
+  </main>
+
+  <!-- host detail modal -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-card">
+      <button id="modal-close" class="modal-close">×</button>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

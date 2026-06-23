@@ -1,0 +1,56 @@
+# Copyright (c) 2026 Rick Bohm
+# Summit Cyber Group, LLC
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Windows / Docker Desktop variant.
+#
+# Run with:  docker compose -f docker-compose.windows.yml up --build
+#
+# Why this differs from docker-compose.yml (Linux/Kali):
+#   * No network_mode: host. On Docker Desktop the container runs inside a WSL2
+#     Linux VM, not on the Windows host, so host networking does NOT give you
+#     the Windows LAN. Instead we use the default bridge and PUBLISH the port.
+#   * Container egress NATs out through the Windows host's network stack, which
+#     means your customer VPN routes ARE honored — scans of routed/VPN subnets
+#     work the same as from Windows itself.
+#   * We bind the published port to 127.0.0.1 on Windows so the UI stays local.
+#
+# Caveat: pure layer-2 / ARP-only discovery of the machine's *own* physical LAN
+# segment won't traverse the WSL2 NAT. ICMP + TCP-SYN discovery (what this tool
+# uses) still reaches those hosts via L3 routing, so live-host detection works;
+# you just won't get ARP/MAC vendor for on-link-only devices. For VPN'd customer
+# subnets (routed anyway) there is no difference.
+services:
+  d1sc0v3r:
+    build: .
+    container_name: d1sc0v3r
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    ports:
+      - "127.0.0.1:8040:8040"   # UI reachable at http://localhost:8040 on Windows
+    environment:
+      D1_HOST: 0.0.0.0          # bind inside the container; Docker maps it to localhost
+      D1_PORT: 8040
+      # Default assumes Ollama runs on the SAME Windows host. Docker Desktop
+      # exposes the host via the magic DNS name host.docker.internal. For a
+      # remote Ollama set D1_LLM_URL=http://<host>:11434 in a .env file.
+      D1_LLM_URL: ${D1_LLM_URL:-http://host.docker.internal:11434}
+      D1_LLM_MODEL: ${D1_LLM_MODEL:-qwen3:8b}
+      D1_LLM_ENABLED: ${D1_LLM_ENABLED:-1}
+    volumes:
+      - ./data:/app/data
+      - ./app:/app/app
+    restart: unless-stopped
