@@ -1,0 +1,15 @@
+# Stuff that should never end up in the image
+.git/
+.gitignore
+data/
+*.db
+*.db-journal
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+*.tgz
+screenshot*.png
+tools/

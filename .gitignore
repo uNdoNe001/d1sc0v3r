@@ -1,0 +1,35 @@
+# d1sc0v3r — files that should NEVER be committed
+# -------------------------------------------------
+# Scan history, raw nmap evidence, customer subnets, anything operational.
+# Treat data/ as engagement evidence — back it up locally, do not push it.
+data/
+*.db
+*.db-journal
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Local overrides / secrets
+.env
+.env.*
+!.env.example
+
+# Editor/OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*~
+
+# Personal AI assistant configs (Claude Code, Cursor, Aider, etc.)
+.claude/
+.cursor/
+.aider*
+
+# Local artifacts
+*.tgz
+screenshot*.png
