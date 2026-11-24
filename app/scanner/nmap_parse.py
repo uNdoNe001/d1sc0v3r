@@ -86,5 +86,19 @@ def parse_nmap_xml(xml_text: str) -> list[Host]:
                     p.scripts[sid] = out
             host.ports.append(p)
 
+        # --traceroute hops. nmap omits hops that never answered, so TTLs can
+        # have gaps; the topology builder treats a gap as an unknown segment.
+        for hop in h.findall("trace/hop"):
+            try:
+                rtt = float(hop.get("rtt", "0") or 0)
+            except ValueError:
+                rtt = 0.0
+            host.trace.append({
+                "ttl": int(hop.get("ttl", "0")),
+                "ip": hop.get("ipaddr", ""),
+                "host": hop.get("host", ""),
+                "rtt": rtt,
+            })
+
         hosts.append(host)
     return hosts

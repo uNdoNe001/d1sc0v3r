@@ -44,6 +44,9 @@
       <label>Profile</label>
       <select id="profile"></select>
 
+      <label class="check"><input type="checkbox" id="traceroute" />
+        Traceroute <span class="dim">(slower, noisier; maps real router hops)</span></label>
+
       <div class="row">
         <button id="preview-btn" class="ghost">Preview</button>
         <button id="scan-btn">Launch sweep</button>
@@ -73,9 +76,31 @@
             <button id="md-btn" class="ghost">⬇ Markdown (Obsidian)</button>
             <button id="copy-btn" class="ghost">⧉ Copy Markdown</button>
             <button id="csv-btn" class="ghost">⬇ CSV</button>
+            <button id="map-btn" class="ghost">⬇ Map (HTML)</button>
           </div>
           <div id="copy-note" class="muted"></div>
         </div>
+      </div>
+
+      <div id="view-toggle" class="view-toggle hidden">
+        <button data-view="list" class="ghost">List</button>
+        <button data-view="map" class="ghost">Map</button>
+      </div>
+
+      <div id="map" class="hidden">
+        <div class="map-stage">
+          <canvas id="map-canvas"></canvas>
+          <div id="map-legend" class="map-legend"></div>
+          <div class="map-term">
+            <div class="map-term-bar"><span>d1sc0v3r — network map</span><span id="map-live" class="map-live">● live</span></div>
+            <div id="map-log" class="map-log"></div>
+          </div>
+          <div class="map-ctl">
+            <button id="map-anim" class="ghost" title="Pause / resume animation">⏸</button>
+            <button id="map-reset" class="ghost" title="Reset rotation + zoom">⟲</button>
+          </div>
+        </div>
+        <p class="muted map-hint">Drag to rotate · scroll to zoom · click a host for details</p>
       </div>
 
       <div id="priority" class="hidden">
@@ -100,6 +125,7 @@
     </div>
   </div>
 
+  <script src="/static/netmap.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

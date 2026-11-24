@@ -119,6 +119,8 @@ async function deleteScan(id, nets) {
     $("#scan-head").classList.add("hidden");
     $("#priority").classList.add("hidden");
     $("#categories").classList.add("hidden");
+    $("#view-toggle").classList.add("hidden");
+    $("#map").classList.add("hidden");
     $("#export").classList.add("hidden");
     $("#empty").classList.remove("hidden");
   }
@@ -138,7 +140,10 @@ $("#preview-btn").onclick = async () => {
 $("#scan-btn").onclick = async () => {
   const r = await api("/api/scan", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ subnets: $("#subnets").value, profile: $("#profile").value }),
+    body: JSON.stringify({
+      subnets: $("#subnets").value, profile: $("#profile").value,
+      traceroute: $("#traceroute").checked,
+    }),
   });
   if (r.scan_id) { openScan(r.scan_id); loadHistory(); }
   else alert(r.detail || "scan failed to start");
@@ -173,8 +178,10 @@ async function refresh() {
   $("#stage").textContent = `[${s.status}] ${s.stage}`;
   $("#scan-subnets").innerHTML = `<span class="muted">scope:</span> `
     + (s.subnets || []).map((n) => `<code class="net">${esc(n)}</code>`).join(" ")
-    + ` <span class="muted">· ${s.profile} · ${esc(s.id)}</span>`;
-  $("#stop-btn").classList.toggle("hidden", !["queued", "sweeping", "deep", "analyzing"].includes(s.status));
+    + ` <span class="muted">· ${s.profile}${(s.options || {}).traceroute ? " · traceroute" : ""} · ${esc(s.id)}</span>`;
+  const running = ["queued", "sweeping", "deep", "tracing", "analyzing"].includes(s.status);
+  $("#stop-btn").classList.toggle("hidden", !running);
+  $("#map-live").classList.toggle("hidden", !running);
 
   const t = s.totals || {};
   const keys = ["live_hosts", "interesting_hosts", "total_assets", "llm_enriched", "elapsed_s"];
@@ -182,6 +189,9 @@ async function refresh() {
     .map((k) => `<span>${k.replace(/_/g, " ")}: ${t[k]}</span>`).join("");
 
   renderHosts(d.hosts);
+  $("#view-toggle").classList.toggle("hidden", d.hosts.length === 0);
+  applyView();
+  if (view === "map" && d.hosts.length) refreshMap();
   $("#export").classList.toggle("hidden", d.hosts.length === 0);
   if (["done", "error", "stopped"].includes(s.status)) {
     clearInterval(poll); poll = null;
@@ -196,6 +206,11 @@ function reportUrl(ext) {
 }
 $("#md-btn").onclick = () => { if (activeScan) window.location = reportUrl("md"); };
 $("#csv-btn").onclick = () => { if (activeScan) window.location = reportUrl("csv"); };
+$("#map-btn").onclick = () => {
+  if (!activeScan) return;
+  const eng = encodeURIComponent($("#engagement").value.trim());
+  window.location = `/api/scan/${activeScan}/map.html?engagement=${eng}`;
+};
 $("#copy-btn").onclick = async () => {
   if (!activeScan) return;
   const md = await fetch(reportUrl("md")).then((r) => r.text());
@@ -207,6 +222,58 @@ $("#copy-btn").onclick = async () => {
   }
   setTimeout(() => ($("#copy-note").textContent = ""), 4000);
 };
+
+// --- network map -----------------------------------------------------------
+let view = "list";
+try { view = localStorage.getItem("d1-view") || "list"; } catch { /* storage blocked */ }
+let netmap = null;
+
+function applyView() {
+  const hasHosts = !$("#view-toggle").classList.contains("hidden");
+  const isMap = view === "map" && hasHosts;
+  $("#map").classList.toggle("hidden", !isMap);
+  if (isMap) {
+    $("#priority").classList.add("hidden");
+    $("#categories").classList.add("hidden");
+  }
+  document.querySelectorAll("#view-toggle button").forEach((b) =>
+    b.classList.toggle("active", b.dataset.view === view));
+}
+
+async function refreshMap() {
+  if (!activeScan) return;
+  const scanId = activeScan;
+  const topo = await api(`/api/scan/${scanId}/topology`);
+  if (scanId !== activeScan || !topo.nodes) return;
+  if (!netmap) {
+    netmap = new NetMap($(".map-stage"), {
+      term: $("#map-log"), legend: $("#map-legend"),
+      onSelect: (n) => {
+        if (n.kind !== "host") return;
+        const h = (window.__lastDetail?.hosts || []).find((x) => x.ip === n.ip);
+        if (h) showHost(h);
+      },
+    });
+    $("#map-anim").textContent = netmap.animate ? "⏸" : "▶";
+  }
+  netmap.setData(topo);
+}
+
+document.querySelectorAll("#view-toggle button").forEach((b) => {
+  b.onclick = () => {
+    view = b.dataset.view;
+    try { localStorage.setItem("d1-view", view); } catch { /* storage blocked */ }
+    if (window.__lastDetail) renderHosts(window.__lastDetail.hosts);
+    applyView();
+    if (view === "map") refreshMap();
+  };
+});
+$("#map-anim").onclick = () => {
+  if (!netmap) return;
+  netmap.setAnimate(!netmap.animate);
+  $("#map-anim").textContent = netmap.animate ? "⏸" : "▶";
+};
+$("#map-reset").onclick = () => netmap && netmap.resetView();
 
 function renderHosts(hosts) {
   const prio = hosts.filter((h) => ["critical", "high"].includes(h.priority_level));

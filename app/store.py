@@ -110,7 +110,7 @@ def reconcile_orphans(live_ids: set[str]) -> list[str]:
     """Any scan with a 'still running' status that isn't actually in the live
     set is an orphan (container restart killed its task). Mark them stopped so
     the UI stops claiming they're sweeping forever. Returns the IDs fixed."""
-    active = {"queued", "sweeping", "deep", "analyzing"}
+    active = {"queued", "sweeping", "deep", "tracing", "analyzing"}
     fixed: list[str] = []
     with _lock:
         rows = _c().execute("SELECT id, data FROM scans").fetchall()

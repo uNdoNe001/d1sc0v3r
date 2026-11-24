@@ -29,7 +29,7 @@ from .. import config, store
 from ..fingerprint import rules
 from ..llm import enrich
 from ..models import Scan
-from . import deepscan, discovery
+from . import deepscan, discovery, trace
 
 # scan_id -> asyncio.Task, so we can stop running scans
 _running: dict[str, asyncio.Task] = {}
@@ -51,7 +51,8 @@ async def _update(scan: Scan, *, status=None, stage=None, progress=None, **total
     store.save_scan(scan)
 
 
-async def run_scan(subnets: list[str], profile_name: str) -> Scan:
+async def run_scan(subnets: list[str], profile_name: str,
+                   options: dict | None = None) -> Scan:
     profile = config.PROFILES.get(profile_name, config.PROFILES[config.DEFAULT_PROFILE])
     scan = Scan(
         id=new_scan_id(),
@@ -59,6 +60,7 @@ async def run_scan(subnets: list[str], profile_name: str) -> Scan:
         subnets=subnets,
         profile=profile_name,
         status="queued",
+        options=options or {},
         totals={"estimated_hosts": discovery.estimate_hosts(subnets)},
     )
     store.save_scan(scan)
@@ -126,12 +128,33 @@ async def _drive(scan: Scan, profile: dict):
         deep_targets = interesting or targets
         hosts = await deepscan.deep_scan_all(deep_targets, scan.id, profile, deep_progress)
 
+        # --- stage 2b: traceroute (opt-in) ---------------------------------
+        traces: dict[str, list[dict]] = {}
+        if scan.options.get("traceroute"):
+            await _update(scan, status="tracing",
+                          stage=f"Traceroute to {live} live hosts", progress=0.8)
+
+            async def trace_progress(done, total):
+                await _update(scan, stage=f"Traceroute batch {done}/{total}",
+                              progress=0.8 + 0.02 * (done / max(total, 1)))
+
+            traces = await trace.trace_all(list(targets), scan.id, profile, trace_progress)
+            await _update(scan, traced_hosts=len(traces))
+
         # --- stage 3: categorize + score ------------------------------------
         await _update(scan, status="analyzing", stage="Categorizing & scoring", progress=0.82)
         for h in hosts:
+            h.trace = traces.get(h.ip, h.trace)
             rules.categorize(h)
             rules.score_priority(h)
             store.save_host(scan.id, h)
+        # live hosts that skipped the deep pass still get their path recorded
+        if traces:
+            deep_ips = {h.ip for h in hosts}
+            for h in store.get_hosts(scan.id):
+                if h.ip not in deep_ips and h.ip in traces:
+                    h.trace = traces[h.ip]
+                    store.save_host(scan.id, h)
 
         # --- stage 4: LLM enrichment ----------------------------------------
         to_enrich = [h for h in hosts if rules.needs_llm(h)]

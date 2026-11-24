@@ -93,6 +93,10 @@ class Host:
     llm_rationale: str = ""
     llm_story: str = ""        # the "this is juicy, here's why" narrative
 
+    # network path from the scanner, only populated when the scan ran with the
+    # traceroute option. Each hop: {"ttl": int, "ip": str, "host": str, "rtt": float}
+    trace: list[dict[str, Any]] = field(default_factory=list)
+
     def open_ports(self) -> list[Port]:
         return [p for p in self.ports if p.state == "open"]
 
@@ -108,11 +112,12 @@ class Scan:
     created_at: str
     subnets: list[str]
     profile: str
-    status: str = "queued"      # queued|sweeping|deep|analyzing|done|error|stopped
+    status: str = "queued"      # queued|sweeping|deep|tracing|analyzing|done|error|stopped
     stage: str = ""             # human-readable current step
     progress: float = 0.0       # 0..1
     error: str = ""
     totals: dict[str, int] = field(default_factory=dict)
+    options: dict[str, Any] = field(default_factory=dict)   # e.g. {"traceroute": True}
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

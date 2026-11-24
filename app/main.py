@@ -24,7 +24,7 @@ from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import config, report, store
+from . import config, map_export, report, store, topology
 from .fingerprint import rules
 from .llm import ollama
 from .scanner import discovery, pipeline
@@ -49,6 +49,7 @@ def _startup():
 class ScanRequest(BaseModel):
     subnets: str
     profile: str = config.DEFAULT_PROFILE
+    traceroute: bool = False    # opt-in: slower + noisier, maps real router hops
 
 
 # --- api -------------------------------------------------------------------
@@ -75,7 +76,7 @@ async def start_scan(req: ScanRequest):
         raise HTTPException(400, f"No valid subnets. Rejected: {bad}")
     if req.profile not in config.PROFILES:
         raise HTTPException(400, f"Unknown profile {req.profile}")
-    scan = await pipeline.run_scan(valid, req.profile)
+    scan = await pipeline.run_scan(valid, req.profile, {"traceroute": req.traceroute})
     return {"scan_id": scan.id, "rejected": bad}
 
 
@@ -96,6 +97,16 @@ def scan_detail(scan_id: str):
     return {"scan": scan.to_dict(), "hosts": hosts}
 
 
+@app.get("/api/scan/{scan_id}/topology")
+def scan_topology(scan_id: str):
+    """Graph for the network map: subnet hubs, hosts, and links labelled as
+    observed (traceroute) or inferred (subnet membership, AD domain, gateway)."""
+    scan = store.get_scan(scan_id)
+    if not scan:
+        raise HTTPException(404, "scan not found")
+    return topology.build(scan, store.get_hosts(scan_id))
+
+
 @app.get("/api/scan/{scan_id}/report.md")
 def report_md(scan_id: str, engagement: str = ""):
     scan = store.get_scan(scan_id)
@@ -105,6 +116,20 @@ def report_md(scan_id: str, engagement: str = ""):
     fname = f"{report.safe_slug(engagement) if engagement else 'discovery'}-{scan_id}.md"
     return PlainTextResponse(
         md, media_type="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
+@app.get("/api/scan/{scan_id}/map.html")
+def map_html(scan_id: str, engagement: str = ""):
+    """Self-contained network map for the client deliverable (opens offline)."""
+    scan = store.get_scan(scan_id)
+    if not scan:
+        raise HTTPException(404, "scan not found")
+    page = map_export.render(scan, store.get_hosts(scan_id), engagement)
+    fname = f"{report.safe_slug(engagement) if engagement else 'discovery'}-{scan_id}-map.html"
+    return Response(
+        page, media_type="text/html; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
 
